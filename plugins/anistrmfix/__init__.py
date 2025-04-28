@@ -15,8 +15,14 @@ import xml.dom.minidom
 from app.utils.dom import DomUtils
 
 
-def retry(ExceptionToCheck: Any,
-          tries: int = 3, delay: int = 3, backoff: int = 1, logger: Any = None, ret: Any = None):
+def retry(
+    ExceptionToCheck: Any,
+    tries: int = 3,
+    delay: int = 3,
+    backoff: int = 1,
+    logger: Any = None,
+    ret: Any = None,
+):
     """
     :param ExceptionToCheck: 需要捕获的异常
     :param tries: 重试次数
@@ -42,7 +48,7 @@ def retry(ExceptionToCheck: Any,
                     mtries -= 1
                     mdelay *= backoff
             if logger:
-                logger.warn('请确保当前季度番剧文件夹存在或检查网络问题')
+                logger.warn("请确保当前季度番剧文件夹存在或检查网络问题")
             return ret
 
         return f_retry
@@ -50,7 +56,7 @@ def retry(ExceptionToCheck: Any,
     return deco_retry
 
 
-class ANiStrm(_PluginBase):
+class ANiStrmFix(_PluginBase):
     # 插件名称
     plugin_name = "ANiStrmFix(自定义源版)"
     # 插件描述
@@ -58,7 +64,7 @@ class ANiStrm(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/cangxun233/MoviePilot-Plugins/main/icons/anistrm.png"
     # 插件版本
-    plugin_version = "2.4.2"
+    plugin_version = "1.1.1"
     # 插件作者
     plugin_author = "cangxun233"
     # 作者主页
@@ -76,7 +82,7 @@ class ANiStrm(_PluginBase):
     _cron = None
     _onlyonce = False
     _fulladd = False
-    _baseurl = 'https://openani.an-i.workers.dev'
+    _baseurl = "openani.an-i.workers.dev"
     _storageplace = None
 
     # 定时器
@@ -100,18 +106,25 @@ class ANiStrm(_PluginBase):
 
             if self._enabled and self._cron:
                 try:
-                    self._scheduler.add_job(func=self.__task,
-                                            trigger=CronTrigger.from_crontab(self._cron),
-                                            name="ANiStrm文件创建")
-                    logger.info(f'ANi-Strm定时任务创建成功：{self._cron}')
+                    self._scheduler.add_job(
+                        func=self.__task,
+                        trigger=CronTrigger.from_crontab(self._cron),
+                        name="ANiStrm文件创建",
+                    )
+                    logger.info(f"ANi-Strm定时任务创建成功：{self._cron}")
                 except Exception as err:
                     logger.error(f"定时任务配置错误：{str(err)}")
 
             if self._onlyonce:
                 logger.info(f"ANi-Strm服务启动，立即运行一次")
-                self._scheduler.add_job(func=self.__task, args=[self._fulladd], trigger='date',
-                                        run_date=datetime.now(tz=pytz.timezone(settings.TZ)) + timedelta(seconds=3),
-                                        name="ANiStrm文件创建")
+                self._scheduler.add_job(
+                    func=self.__task,
+                    args=[self._fulladd],
+                    trigger="date",
+                    run_date=datetime.now(tz=pytz.timezone(settings.TZ))
+                    + timedelta(seconds=3),
+                    name="ANiStrm文件创建",
+                )
                 # 关闭一次性开关 全量转移
                 self._onlyonce = False
                 self._fulladd = False
@@ -128,24 +141,28 @@ class ANiStrm(_PluginBase):
         current_month = idx_month if idx_month else current_date.month
         for month in range(current_month, 0, -1):
             if month in [10, 7, 4, 1]:
-                self._date = f'{current_year}-{month}'
-                return f'{current_year}-{month}'
+                self._date = f"{current_year}-{month}"
+                return f"{current_year}-{month}"
 
     @retry(Exception, tries=3, logger=logger, ret=[])
     def get_current_season_list(self) -> List:
-        url = f'{self._baseurl}/{self.__get_ani_season()}/'
+        url = f"https://{self._baseurl}/{self.__get_ani_season()}/"
 
-        rep = RequestUtils(ua=settings.USER_AGENT if settings.USER_AGENT else None,
-                           proxies=settings.PROXY if settings.PROXY else None).post(url=url)
+        rep = RequestUtils(
+            ua=settings.USER_AGENT if settings.USER_AGENT else None,
+            proxies=settings.PROXY if settings.PROXY else None,
+        ).post(url=url)
         logger.debug(rep.text)
-        files_json = rep.json()['files']
-        return [file['name'] for file in files_json]
+        files_json = rep.json()["files"]
+        return [file["name"] for file in files_json]
 
     @retry(Exception, tries=3, logger=logger, ret=[])
     def get_latest_list(self) -> List:
-        addr = 'https://api.ani.rip/ani-download.xml'
-        ret = RequestUtils(ua=settings.USER_AGENT if settings.USER_AGENT else None,
-                           proxies=settings.PROXY if settings.PROXY else None).get_res(addr)
+        addr = "https://api.ani.rip/ani-download.xml"
+        ret = RequestUtils(
+            ua=settings.USER_AGENT if settings.USER_AGENT else None,
+            proxies=settings.PROXY if settings.PROXY else None,
+        ).get_res(addr)
         ret_xml = ret.text
         ret_array = []
         # 解析XML
@@ -158,27 +175,29 @@ class ANiStrm(_PluginBase):
             title = DomUtils.tag_value(item, "title", default="")
             # 链接
             link = DomUtils.tag_value(item, "link", default="")
-            rss_info['title'] = title
-            rss_info['link'] = link.replace("resources.ani.rip", "openani.an-i.workers.dev")
+            rss_info["title"] = title
+            rss_info["link"] = link.replace(
+                "resources.ani.rip", self._baseurl
+            )
             ret_array.append(rss_info)
         return ret_array
 
     def __touch_strm_file(self, file_name, file_url: str = None) -> bool:
         if not file_url:
-            src_url = f'{self._baseurl}/{self._date}/{file_name}?d=true'
+            src_url = f"https://{self._baseurl}/{self._date}/{file_name}?d=true"
         else:
             src_url = file_url
-        file_path = f'{self._storageplace}/{file_name}.strm'
+        file_path = f"{self._storageplace}/{file_name}.strm"
         if os.path.exists(file_path):
-            logger.debug(f'{file_name}.strm 文件已存在')
+            logger.debug(f"{file_name}.strm 文件已存在")
             return False
         try:
-            with open(file_path, 'w') as file:
+            with open(file_path, "w") as file:
                 file.write(src_url)
-                logger.debug(f'创建 {file_name}.strm 文件成功')
+                logger.debug(f"创建 {file_name}.strm 文件成功")
                 return True
         except Exception as e:
-            logger.error('创建strm源文件失败：' + str(e))
+            logger.error("创建strm源文件失败：" + str(e))
             return False
 
     def __task(self, fulladd: bool = False):
@@ -186,18 +205,20 @@ class ANiStrm(_PluginBase):
         # 增量添加更新
         if not fulladd:
             rss_info_list = self.get_latest_list()
-            logger.info(f'本次处理 {len(rss_info_list)} 个文件')
+            logger.info(f"本次处理 {len(rss_info_list)} 个文件")
             for rss_info in rss_info_list:
-                if self.__touch_strm_file(file_name=rss_info['title'], file_url=rss_info['link']):
+                if self.__touch_strm_file(
+                    file_name=rss_info["title"], file_url=rss_info["link"]
+                ):
                     cnt += 1
         # 全量添加当季
         else:
             name_list = self.get_current_season_list()
-            logger.info(f'本次处理 {len(name_list)} 个文件')
+            logger.info(f"本次处理 {len(name_list)} 个文件")
             for file_name in name_list:
                 if self.__touch_strm_file(file_name=file_name):
                     cnt += 1
-        logger.info(f'新创建了 {cnt} 个strm文件')
+        logger.info(f"新创建了 {cnt} 个strm文件")
 
     def get_state(self) -> bool:
         return self._enabled
@@ -215,171 +236,158 @@ class ANiStrm(_PluginBase):
         """
         return [
             {
-                'component': 'VForm',
-                'content': [
+                "component": "VForm",
+                "content": [
                     {
-                        'component': 'VRow',
-                        'content': [
+                        "component": "VRow",
+                        "content": [
                             {
-                                'component': 'VCol',
-                                'props': {
-                                    'cols': 12,
-                                    'md': 4
-                                },
-                                'content': [
+                                "component": "VCol",
+                                "props": {"cols": 12, "md": 4},
+                                "content": [
                                     {
-                                        'component': 'VSwitch',
-                                        'props': {
-                                            'model': 'enabled',
-                                            'label': '启用插件',
-                                        }
+                                        "component": "VSwitch",
+                                        "props": {
+                                            "model": "enabled",
+                                            "label": "启用插件",
+                                        },
                                     }
-                                ]
+                                ],
                             },
                             {
-                                'component': 'VCol',
-                                'props': {
-                                    'cols': 12,
-                                    'md': 4
-                                },
-                                'content': [
+                                "component": "VCol",
+                                "props": {"cols": 12, "md": 4},
+                                "content": [
                                     {
-                                        'component': 'VSwitch',
-                                        'props': {
-                                            'model': 'onlyonce',
-                                            'label': '立即运行一次',
-                                        }
+                                        "component": "VSwitch",
+                                        "props": {
+                                            "model": "onlyonce",
+                                            "label": "立即运行一次",
+                                        },
                                     }
-                                ]
+                                ],
                             },
                             {
-                                'component': 'VCol',
-                                'props': {
-                                    'cols': 12,
-                                    'md': 4
-                                },
-                                'content': [
+                                "component": "VCol",
+                                "props": {"cols": 12, "md": 4},
+                                "content": [
                                     {
-                                        'component': 'VSwitch',
-                                        'props': {
-                                            'model': 'fulladd',
-                                            'label': '下次创建当前季度所有番剧strm',
-                                        }
+                                        "component": "VSwitch",
+                                        "props": {
+                                            "model": "fulladd",
+                                            "label": "下次创建当前季度所有番剧strm",
+                                        },
                                     }
-                                ]
-                            }
-                        ]
+                                ],
+                            },
+                        ],
                     },
                     {
-                        'component': 'VRow',
-                        'content': [
+                        "component": "VRow",
+                        "content": [
                             {
-                                'component': 'VCol',
-                                'props': {
-                                    'cols': 12,
-                                    'md': 4
-                                },
-                                'content': [
+                                "component": "VCol",
+                                "props": {"cols": 12, "md": 4},
+                                "content": [
                                     {
-                                        'component': 'VTextField',
-                                        'props': {
-                                            'model': 'baseurl',
-                                            'label': '自定义CF源',
-                                            'placeholder': 'https://openani.an-i.workers.dev'
-                                        }
+                                        "component": "VTextField",
+                                        "props": {
+                                            "model": "baseurl",
+                                            "label": "自定义CF源",
+                                            "placeholder": "openani.an-i.workers.dev",
+                                        },
                                     }
-                                ]
+                                ],
                             },
                             {
-                                'component': 'VCol',
-                                'props': {
-                                    'cols': 12,
-                                    'md': 4
-                                },
-                                'content': [
+                                "component": "VCol",
+                                "props": {"cols": 12, "md": 4},
+                                "content": [
                                     {
-                                        'component': 'VTextField',
-                                        'props': {
-                                            'model': 'cron',
-                                            'label': '执行周期',
-                                            'placeholder': '0 0 ? ? ?'
-                                        }
+                                        "component": "VTextField",
+                                        "props": {
+                                            "model": "cron",
+                                            "label": "执行周期",
+                                            "placeholder": "0 0 ? ? ?",
+                                        },
                                     }
-                                ]
+                                ],
                             },
                             {
-                                'component': 'VCol',
-                                'props': {
-                                    'cols': 12,
-                                    'md': 4
-                                },
-                                'content': [
+                                "component": "VCol",
+                                "props": {"cols": 12, "md": 4},
+                                "content": [
                                     {
-                                        'component': 'VTextField',
-                                        'props': {
-                                            'model': 'storageplace',
-                                            'label': 'Strm存储地址',
-                                            'placeholder': '/downloads/strm'
-                                        }
+                                        "component": "VTextField",
+                                        "props": {
+                                            "model": "storageplace",
+                                            "label": "Strm存储地址",
+                                            "placeholder": "/downloads/strm",
+                                        },
                                     }
-                                ]
-                            }
-                        ]
+                                ],
+                            },
+                        ],
                     },
                     {
-                        'component': 'VRow',
-                        'content': [
+                        "component": "VRow",
+                        "content": [
                             {
-                                'component': 'VCol',
-                                'props': {
-                                    'cols': 12,
+                                "component": "VCol",
+                                "props": {
+                                    "cols": 12,
                                 },
-                                'content': [
+                                "content": [
                                     {
-                                        'component': 'VAlert',
-                                        'props': {
-                                            'type': 'info',
-                                            'variant': 'tonal',
-                                            'text': '自动从open ANi抓取下载直链生成strm文件，免去人工订阅下载' + '\n' +
-                                                    '配合目录监控使用，strm文件创建在/downloads/strm' + '\n' +
-                                                    '通过目录监控转移到link媒体库文件夹 如/downloads/link/strm  mp会完成刮削',
-                                            'style': 'white-space: pre-line;'
-                                        }
+                                        "component": "VAlert",
+                                        "props": {
+                                            "type": "info",
+                                            "variant": "tonal",
+                                            "text": "自动从open ANi抓取下载直链生成strm文件，免去人工订阅下载"
+                                            + "\n"
+                                            + "配合目录监控使用，strm文件创建在/downloads/strm"
+                                            + "\n"
+                                            + "通过目录监控转移到link媒体库文件夹 如/downloads/link/strm  mp会完成刮削",
+                                            "style": "white-space: pre-line;",
+                                        },
                                     },
                                     {
-                                        'component': 'VAlert',
-                                        'props': {
-                                            'type': 'info',
-                                            'variant': 'tonal',
-                                            'text': 'emby容器需要设置代理，docker的环境变量必须要有http_proxy代理变量，大小写敏感，具体见readme.' + '\n' +
-                                                    'https://github.com/honue/MoviePilot-Plugins',
-                                            'style': 'white-space: pre-line;'
-                                        }
-                                    }
-                                ]
+                                        "component": "VAlert",
+                                        "props": {
+                                            "type": "info",
+                                            "variant": "tonal",
+                                            "text": "emby容器需要设置代理，docker的环境变量必须要有http_proxy代理变量，大小写敏感，具体见readme."
+                                            + "\n"
+                                            + "https://github.com/cangxun233/MoviePilot-Plugins",
+                                            "style": "white-space: pre-line;",
+                                        },
+                                    },
+                                ],
                             }
-                        ]
-                    }
-                ]
+                        ],
+                    },
+                ],
             }
         ], {
             "enabled": False,
             "onlyonce": False,
             "fulladd": False,
-            "baseurl": 'https://openani.an-i.workers.dev',
-            "storageplace": '/downloads/strm',
+            "baseurl": "openani.an-i.workers.dev",
+            "storageplace": "/downloads/strm",
             "cron": "*/20 22,23,0,1 * * *",
         }
 
     def __update_config(self):
-        self.update_config({
-            "onlyonce": self._onlyonce,
-            "cron": self._cron,
-            "enabled": self._enabled,
-            "fulladd": self._fulladd,
-            "baseurl": self._baseurl,
-            "storageplace": self._storageplace,
-        })
+        self.update_config(
+            {
+                "onlyonce": self._onlyonce,
+                "cron": self._cron,
+                "enabled": self._enabled,
+                "fulladd": self._fulladd,
+                "baseurl": self._baseurl,
+                "storageplace": self._storageplace,
+            }
+        )
 
     def get_page(self) -> List[dict]:
         pass
@@ -399,6 +407,6 @@ class ANiStrm(_PluginBase):
 
 
 if __name__ == "__main__":
-    anistrm = ANiStrm()
-    name_list = anistrm.get_latest_list()
+    anistrmfix = ANiStrmFix()
+    name_list = anistrmfix.get_latest_list()
     print(name_list)
