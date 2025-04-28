@@ -52,19 +52,19 @@ def retry(ExceptionToCheck: Any,
 
 class ANiStrm(_PluginBase):
     # 插件名称
-    plugin_name = "ANiStrm"
+    plugin_name = "ANiStrmFix(自定义源版)"
     # 插件描述
     plugin_desc = "自动获取当季所有番剧，免去下载，轻松拥有一个番剧媒体库"
     # 插件图标
-    plugin_icon = "https://raw.githubusercontent.com/honue/MoviePilot-Plugins/main/icons/anistrm.png"
+    plugin_icon = "https://raw.githubusercontent.com/cangxun233/MoviePilot-Plugins/main/icons/anistrm.png"
     # 插件版本
     plugin_version = "2.4.2"
     # 插件作者
-    plugin_author = "honue"
+    plugin_author = "cangxun233"
     # 作者主页
-    author_url = "https://github.com/honue"
+    author_url = "https://github.com/cangxun233"
     # 插件配置项ID前缀
-    plugin_config_prefix = "anistrm_"
+    plugin_config_prefix = "anistrm_fix_"
     # 加载顺序
     plugin_order = 15
     # 可使用的用户级别
@@ -76,6 +76,7 @@ class ANiStrm(_PluginBase):
     _cron = None
     _onlyonce = False
     _fulladd = False
+    _baseurl = 'https://openani.an-i.workers.dev'
     _storageplace = None
 
     # 定时器
@@ -90,6 +91,7 @@ class ANiStrm(_PluginBase):
             self._cron = config.get("cron")
             self._onlyonce = config.get("onlyonce")
             self._fulladd = config.get("fulladd")
+            self._baseurl = config.get("baseurl")
             self._storageplace = config.get("storageplace")
             # 加载模块
         if self._enabled or self._onlyonce:
@@ -131,7 +133,7 @@ class ANiStrm(_PluginBase):
 
     @retry(Exception, tries=3, logger=logger, ret=[])
     def get_current_season_list(self) -> List:
-        url = f'https://openani.an-i.workers.dev/{self.__get_ani_season()}/'
+        url = f'{self._baseurl}/{self.__get_ani_season()}/'
 
         rep = RequestUtils(ua=settings.USER_AGENT if settings.USER_AGENT else None,
                            proxies=settings.PROXY if settings.PROXY else None).post(url=url)
@@ -163,7 +165,7 @@ class ANiStrm(_PluginBase):
 
     def __touch_strm_file(self, file_name, file_url: str = None) -> bool:
         if not file_url:
-            src_url = f'https://openani.an-i.workers.dev/{self._date}/{file_name}?d=true'
+            src_url = f'{self._baseurl}/{self._date}/{file_name}?d=true'
         else:
             src_url = file_url
         file_path = f'{self._storageplace}/{file_name}.strm'
@@ -281,6 +283,23 @@ class ANiStrm(_PluginBase):
                                     {
                                         'component': 'VTextField',
                                         'props': {
+                                            'model': 'baseurl',
+                                            'label': '自定义CF源',
+                                            'placeholder': 'https://openani.an-i.workers.dev'
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 4
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VTextField',
+                                        'props': {
                                             'model': 'cron',
                                             'label': '执行周期',
                                             'placeholder': '0 0 ? ? ?'
@@ -347,6 +366,7 @@ class ANiStrm(_PluginBase):
             "enabled": False,
             "onlyonce": False,
             "fulladd": False,
+            "baseurl": 'https://openani.an-i.workers.dev',
             "storageplace": '/downloads/strm',
             "cron": "*/20 22,23,0,1 * * *",
         }
@@ -357,6 +377,7 @@ class ANiStrm(_PluginBase):
             "cron": self._cron,
             "enabled": self._enabled,
             "fulladd": self._fulladd,
+            "baseurl": self._baseurl,
             "storageplace": self._storageplace,
         })
 
