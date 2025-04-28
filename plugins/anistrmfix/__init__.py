@@ -64,13 +64,13 @@ class ANiStrmFix(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/cangxun233/MoviePilot-Plugins/main/icons/anistrm.png"
     # 插件版本
-    plugin_version = "1.1.1"
+    plugin_version = "3.1.1"
     # 插件作者
     plugin_author = "cangxun233"
     # 作者主页
     author_url = "https://github.com/cangxun233"
     # 插件配置项ID前缀
-    plugin_config_prefix = "anistrm_fix_"
+    plugin_config_prefix = "anistrmfix_"
     # 加载顺序
     plugin_order = 15
     # 可使用的用户级别
@@ -176,9 +176,7 @@ class ANiStrmFix(_PluginBase):
             # 链接
             link = DomUtils.tag_value(item, "link", default="")
             rss_info["title"] = title
-            rss_info["link"] = link.replace(
-                "resources.ani.rip", self._baseurl
-            )
+            rss_info["link"] = link.replace("resources.ani.rip", self._baseurl)
             ret_array.append(rss_info)
         return ret_array
 
